@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  role          Role
+  referralCode  String   @unique
+  referredBy    String?
+  points        Int      @default(0)
+
+  createdAt     DateTime @default(now())
+
+  pointHistories PointHistory[]
+  coupons        Coupon[]
+
+  resetToken   String?
+  resetTokenExp DateTime?
+}
+
+model PointHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  amount    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Coupon {
+  id        String   @id @default(uuid())
+  code      String
+  discount  Int
+  userId    String
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  CUSTOMER
+  ORGANIZER
+}

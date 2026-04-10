@@ -1,73 +1,96 @@
+require("dotenv").config()
+
 const express = require("express")
 const cors = require("cors")
-require("dotenv").config()
-require("./cron/pointExpiration") // Jalankan cron untuk cek expired points
+const helmet = require("helmet")
+const morgan = require("morgan")
+const rateLimit = require("express-rate-limit")
 
 const app = express()
 
-// ================= MIDDLEWARE =================
-app.use(cors())
+// ================= CORE MIDDLEWARE =================
+
+app.use(helmet())
+app.use(morgan("dev"))
+
+app.use(cors({
+  origin: "http://localhost:5173", // ✅ FRONTEND VITE
+  credentials: true
+}))
+
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+// ================= RATE LIMIT =================
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many requests, please try again later"
+  }
+})
+
+app.use(globalLimiter)
+
+// ================= LOAD ROUTES (NO MORE SILENT ERROR) =================
+
+// ❌ JANGAN pakai try-catch di sini
+// Kalau error → biarkan crash biar kelihatan
+
+const authRoutes = require("./routes/auth.routes")
+const eventRoutes = require("./routes/event.routes")
+const transactionRoutes = require("./routes/transaction.routes")
+const dashboardRoutes = require("./routes/dashboard.routes")
 
 // ================= ROUTES =================
-const authRoutes = require("./routes/auth.routes")
-const authMiddleware = require("./middleware/auth.middleware")
-const roleMiddleware = require("./middleware/role.middleware")
 
 app.use("/api/auth", authRoutes)
+app.use("/api/events", eventRoutes)
+app.use("/api/transactions", transactionRoutes)
+app.use("/api/dashboard", dashboardRoutes)
 
 // ================= ROOT =================
-app.get("/", (req, res) => {
-  res.send("API RUNNING 🚀")
-})
 
-// ================= PROTECTED ROUTE =================
-app.get("/api/profile", authMiddleware, (req, res) => {
+app.get("/", (req, res) => {
   res.json({
-    message: "SUCCESS ACCESS",
-    user: req.user
+    success: true,
+    message: "API RUNNING 🚀"
   })
 })
 
-// ================= ROLE BASED ROUTE =================
+// ================= HEALTH CHECK =================
 
-//  hanya CUSTOMER
-app.get(
-  "/api/customer",
-  authMiddleware,
-  roleMiddleware("CUSTOMER"),
-  (req, res) => {
-    res.json({
-      message: "WELCOME CUSTOMER",
-      user: req.user
-    })
-  }
-)
+app.get("/health", (req, res) => {
+  res.json({
+    success: true,
+    status: "OK",
+    timestamp: new Date()
+  })
+})
 
-//  hanya ORGANIZER
-app.get(
-  "/api/organizer",
-  authMiddleware,
-  roleMiddleware("ORGANIZER"),
-  (req, res) => {
-    res.json({
-      message: "WELCOME ORGANIZER",
-      user: req.user
-    })
-  }
-)
+// ================= 404 =================
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found"
+  })
+})
 
 // ================= ERROR HANDLER =================
-app.use((err, req, res, next) => {
-  console.error(err)
-  res.status(500).json({
-    message: "Internal Server Error"
-  })
-})
+
+const errorMiddleware = require("./middleware/error.middleware")
+
+app.use(errorMiddleware)
 
 // ================= SERVER =================
+
 const PORT = process.env.PORT || 3000
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+  console.log(`🚀 Server running on port ${PORT}`)
 })

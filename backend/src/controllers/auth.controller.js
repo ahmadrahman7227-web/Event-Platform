@@ -1,106 +1,43 @@
+const jwt = require("jsonwebtoken")
 const prisma = require("../prisma/client")
 const bcrypt = require("bcryptjs")
-const jwt = require("jsonwebtoken")
-const { generate } = require("voucher-code-generator")
 const dayjs = require("dayjs")
 
+const {
+  registerService,
+  loginService,
+  generateResetToken
+} = require("../services/auth.service")
+
+const { registerSchema } = require("../validations/auth.validation")
+
 // ================= REGISTER =================
-exports.register = async (req, res) => {
+exports.register = async (req, res, next) => {
   try {
-    const { email, password, referralCode } = req.body
+    const validated = registerSchema.parse(req.body)
 
-    // cek email sudah ada
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
+    const user = await registerService(validated)
 
-    if (existingUser) {
-      return res.status(400).json({ message: "Email already used" })
-    }
-
-    // hash password
-    const hashedPassword = await bcrypt.hash(password, 10)
-
-    // generate referral sendiri
-    const myReferral = generate({ length: 6 })[0]
-
-    // cari user referral
-    let referredUser = null
-
-    if (referralCode) {
-      referredUser = await prisma.user.findUnique({
-        where: { referralCode }
-      })
-    }
-
-    // create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        role: "CUSTOMER",
-        referralCode: myReferral,
-        referredBy: referredUser ? referredUser.id : null
-      }
-    })
-
-    // kasih reward
-    if (referredUser) {
-      console.log("REFERRAL VALID → kasih reward")
-
-      // point ke referrer
-      await prisma.pointHistory.create({
-        data: {
-          userId: referredUser.id,
-          amount: 10000,
-          expiresAt: dayjs().add(3, "month").toDate()
-        }
-      })
-
-      // coupon ke user baru
-      await prisma.coupon.create({
-        data: {
-          code: generate({ length: 6 })[0],
-          discount: 10,
-          userId: user.id,
-          expiresAt: dayjs().add(3, "month").toDate()
-        }
-      })
-    }
-
-    res.json({
+    return res.status(201).json({
+      success: true,
       message: "Register success",
-      user: {
+      data: {
         id: user.id,
         email: user.email,
-        referralCode: user.referralCode,
-        referredBy: user.referredBy
+        referralCode: user.referralCode
       }
     })
-
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    next(err)
   }
 }
 
 // ================= LOGIN =================
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body
 
-    const user = await prisma.user.findUnique({
-      where: { email }
-    })
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" })
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password)
-
-    if (!isMatch) {
-      return res.status(400).json({ message: "Wrong password" })
-    }
+    const user = await loginService({ email, password })
 
     const token = jwt.sign(
       {
@@ -108,50 +45,125 @@ exports.login = async (req, res) => {
         role: user.role
       },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      {
+        expiresIn: "1d"
+      }
     )
 
-    res.json({
+    return res.json({
+      success: true,
       message: "Login success",
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role
+        }
+      }
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ================= GET PROFILE =================
+exports.getProfile = async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        profileImage: true,
+        referralCode: true
       }
     })
 
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      })
+    }
+
+    return res.json({
+      success: true,
+      message: "Profile fetched",
+      data: user
+    })
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    next(err)
   }
 }
 
 // ================= UPDATE PROFILE =================
-exports.updateProfile = async (req, res) => {
+exports.updateProfile = async (req, res, next) => {
   try {
     const { email } = req.body
 
-    const user = await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data: { email }
     })
 
-    res.json({
+    return res.json({
+      success: true,
       message: "Profile updated",
-      user: {
-        id: user.id,
-        email: user.email
+      data: {
+        id: updatedUser.id,
+        email: updatedUser.email
       }
     })
-
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    next(err)
   }
 }
 
+// ================= CHANGE PASSWORD =================
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { oldPassword, newPassword } = req.body
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    })
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Email already exists"
+      })
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password)
+
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Wrong password"
+      })
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword }
+    })
+
+    return res.json({
+      success: true,
+      message: "Password updated successfully"
+    })
+  } catch (err) {
+    next(err)
+  }
+}
 
 // ================= FORGOT PASSWORD =================
-exports.forgotPassword = async (req, res) => {
+exports.forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body
 
@@ -160,10 +172,13 @@ exports.forgotPassword = async (req, res) => {
     })
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      })
     }
 
-    const resetToken = Math.random().toString(36).substring(2, 10)
+    const resetToken = generateResetToken()
 
     await prisma.user.update({
       where: { id: user.id },
@@ -173,19 +188,18 @@ exports.forgotPassword = async (req, res) => {
       }
     })
 
-    res.json({
-      message: "Reset token created",
-      resetToken   // ⚠️ biasanya dikirim via email, tapi kita tampilkan
+    // 🔥 nanti kirim via email (nodemailer)
+    return res.json({
+      success: true,
+      message: "Reset token generated (check email in production)"
     })
-
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    next(err)
   }
 }
 
-
 // ================= RESET PASSWORD =================
-exports.resetPassword = async (req, res) => {
+exports.resetPassword = async (req, res, next) => {
   try {
     const { token, newPassword } = req.body
 
@@ -199,7 +213,10 @@ exports.resetPassword = async (req, res) => {
     })
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token" })
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token"
+      })
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10)
@@ -213,11 +230,40 @@ exports.resetPassword = async (req, res) => {
       }
     })
 
-    res.json({
+    return res.json({
+      success: true,
       message: "Password reset success"
     })
-
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    next(err)
+  }
+}
+
+// ================= UPLOAD PROFILE IMAGE =================
+exports.uploadProfile = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded"
+      })
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        profileImage: req.file.path
+      }
+    })
+
+    return res.json({
+      success: true,
+      message: "Profile image updated",
+      data: {
+        profileImage: updatedUser.profileImage
+      }
+    })
+  } catch (err) {
+    next(err)
   }
 }

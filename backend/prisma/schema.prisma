@@ -7,23 +7,81 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//////////////////////
+// ENUM
+//////////////////////
+
+enum Role {
+  CUSTOMER
+  ORGANIZER
+}
+
+enum CouponType {
+  REFERRAL
+  EVENT
+}
+
+enum TransactionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+//////////////////////
+// USER
+//////////////////////
+
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  password      String
-  role          Role
-  referralCode  String   @unique
-  referredBy    String?
-  points        Int      @default(0)
+  id           String @id @default(uuid())
+  email        String @unique
+  password     String
+  role         Role   @default(CUSTOMER)
+  referralCode String @unique
 
-  createdAt     DateTime @default(now())
+  referredBy String?
+  referrer   User?   @relation("UserReferral", fields: [referredBy], references: [id])
+  referrals  User[]  @relation("UserReferral")
 
+  profileImage String?
+
+  resetToken    String?
+  resetTokenExp DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // RELATIONS
+  events         Event[]        @relation("EventOrganizer")
+  transactions   Transaction[]
   pointHistories PointHistory[]
   coupons        Coupon[]
 
-  resetToken   String?
-  resetTokenExp DateTime?
+  referralsMade Referral[] @relation("Referrer")
+  referralsUsed Referral[] @relation("Referred")
+
+  @@index([referredBy])
 }
+
+//////////////////////
+// REFERRAL
+//////////////////////
+
+model Referral {
+  id             String @id @default(uuid())
+  referrerId     String
+  referredUserId String
+
+  createdAt DateTime @default(now())
+
+  referrer     User @relation("Referrer", fields: [referrerId], references: [id])
+  referredUser User @relation("Referred", fields: [referredUserId], references: [id])
+
+  @@unique([referrerId, referredUserId])
+}
+
+//////////////////////
+// POINT HISTORY
+//////////////////////
 
 model PointHistory {
   id        String   @id @default(uuid())
@@ -33,20 +91,86 @@ model PointHistory {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
 }
+
+//////////////////////
+// COUPON
+//////////////////////
 
 model Coupon {
   id        String   @id @default(uuid())
-  code      String
+  code      String   @unique
   discount  Int
   userId    String
   expiresAt DateTime
   isUsed    Boolean  @default(false)
 
-  user User @relation(fields: [userId], references: [id])
+  type CouponType @default(REFERRAL)
+
+  createdAt DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[] // ✅ FIX RELATION
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
-enum Role {
-  CUSTOMER
-  ORGANIZER
+//////////////////////
+// EVENT
+//////////////////////
+
+model Event {
+  id             String @id @default(uuid())
+  title          String
+  description    String
+  location       String
+  price          Int
+  availableSeats Int
+
+  startDate DateTime
+  endDate   DateTime
+
+  organizerId String
+  organizer   User   @relation("EventOrganizer", fields: [organizerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ✅ FIX RELATION
+  transactions Transaction[]
+
+  @@index([organizerId])
+  @@index([startDate])
+}
+
+//////////////////////
+// TRANSACTION
+//////////////////////
+
+model Transaction {
+  id      String @id @default(uuid())
+  userId  String
+  eventId String
+
+  quantity   Int
+  totalPrice Int
+
+  usedPoints Int     @default(0)
+  couponId   String?
+
+  status TransactionStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id])
+  event  Event   @relation(fields: [eventId], references: [id])
+  coupon Coupon? @relation(fields: [couponId], references: [id])
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([couponId])
 }

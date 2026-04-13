@@ -1,13 +1,15 @@
 const express = require("express")
 const router = express.Router()
 
+// ================= CONTROLLER =================
 const {
   getDashboardStats,
   getAttendees,
   getChartData
 } = require("../controllers/dashboard.controller")
 
-const authenticate = require("../middleware/auth.middleware")
+// ================= MIDDLEWARE =================
+const { verifyToken } = require("../middleware/auth.middleware")
 const authorize = require("../middleware/role.middleware")
 
 // ================= DASHBOARD =================
@@ -15,7 +17,7 @@ const authorize = require("../middleware/role.middleware")
 // 📊 Stats
 router.get(
   "/stats",
-  authenticate,
+  verifyToken,
   authorize("ORGANIZER"),
   getDashboardStats
 )
@@ -23,7 +25,7 @@ router.get(
 // 👥 Attendees per event
 router.get(
   "/attendees/:eventId",
-  authenticate,
+  verifyToken,
   authorize("ORGANIZER"),
   getAttendees
 )
@@ -31,7 +33,7 @@ router.get(
 // 📈 Chart data
 router.get(
   "/charts",
-  authenticate,
+  verifyToken,
   authorize("ORGANIZER"),
   getChartData
 )

@@ -1,4 +1,3 @@
-const jwt = require("jsonwebtoken")
 const prisma = require("../prisma/client")
 const bcrypt = require("bcryptjs")
 const dayjs = require("dayjs")
@@ -11,10 +10,16 @@ const {
 
 const { registerSchema } = require("../validations/auth.validation")
 
+const { deleteFromCloudinary } = require("../utils/cloudinary")
+
+// ================= HELPER =================
+const normalizeEmail = (email) => email?.trim().toLowerCase()
+
 // ================= REGISTER =================
 exports.register = async (req, res, next) => {
   try {
     const validated = registerSchema.parse(req.body)
+    validated.email = normalizeEmail(validated.email)
 
     const user = await registerService(validated)
 
@@ -35,30 +40,29 @@ exports.register = async (req, res, next) => {
 // ================= LOGIN =================
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body
+    let { email, password } = req.body
 
-    const user = await loginService({ email, password })
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required"
+      })
+    }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        role: user.role
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "1d"
-      }
-    )
+    email = normalizeEmail(email)
+
+    const result = await loginService({ email, password })
 
     return res.json({
       success: true,
       message: "Login success",
       data: {
-        token,
+        token: result.token,
         user: {
-          id: user.id,
-          email: user.email,
-          role: user.role
+          id: result.user.id,
+          email: result.user.email,
+          role: result.user.role,
+          image: result.user.profileImage
         }
       }
     })
@@ -72,12 +76,9 @@ exports.getProfile = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        profileImage: true,
-        referralCode: true
+      include: {
+        coupons: true,
+        pointHistories: true
       }
     })
 
@@ -88,10 +89,21 @@ exports.getProfile = async (req, res, next) => {
       })
     }
 
+    const points =
+      user.pointHistories?.reduce((acc, p) => acc + p.amount, 0) || 0
+
     return res.json({
       success: true,
       message: "Profile fetched",
-      data: user
+      data: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        referralCode: user.referralCode,
+        image: user.profileImage,
+        points,
+        coupons: user.coupons
+      }
     })
   } catch (err) {
     next(err)
@@ -101,7 +113,9 @@ exports.getProfile = async (req, res, next) => {
 // ================= UPDATE PROFILE =================
 exports.updateProfile = async (req, res, next) => {
   try {
-    const { email } = req.body
+    let { email } = req.body
+
+    if (email) email = normalizeEmail(email)
 
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
@@ -126,16 +140,18 @@ exports.changePassword = async (req, res, next) => {
   try {
     const { oldPassword, newPassword } = req.body
 
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Old and new password are required"
+      })
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id }
     })
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Email already exists"
-      })
-    }
+    if (!user) throw { status: 404, message: "User not found" }
 
     const isMatch = await bcrypt.compare(oldPassword, user.password)
 
@@ -155,7 +171,7 @@ exports.changePassword = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: "Password updated successfully"
+      message: "Password updated"
     })
   } catch (err) {
     next(err)
@@ -165,16 +181,23 @@ exports.changePassword = async (req, res, next) => {
 // ================= FORGOT PASSWORD =================
 exports.forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body
+    let { email } = req.body
 
-    const user = await prisma.user.findUnique({
-      where: { email }
-    })
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required"
+      })
+    }
+
+    email = normalizeEmail(email)
+
+    const user = await prisma.user.findUnique({ where: { email } })
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found"
+      return res.json({
+        success: true,
+        message: "If email exists, reset token sent"
       })
     }
 
@@ -188,10 +211,10 @@ exports.forgotPassword = async (req, res, next) => {
       }
     })
 
-    // 🔥 nanti kirim via email (nodemailer)
     return res.json({
       success: true,
-      message: "Reset token generated (check email in production)"
+      message: "Reset token generated",
+      data: { token: resetToken } // nanti diganti email
     })
   } catch (err) {
     next(err)
@@ -203,12 +226,17 @@ exports.resetPassword = async (req, res, next) => {
   try {
     const { token, newPassword } = req.body
 
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Token and new password required"
+      })
+    }
+
     const user = await prisma.user.findFirst({
       where: {
         resetToken: token,
-        resetTokenExp: {
-          gt: new Date()
-        }
+        resetTokenExp: { gt: new Date() }
       }
     })
 
@@ -239,9 +267,11 @@ exports.resetPassword = async (req, res, next) => {
   }
 }
 
-// ================= UPLOAD PROFILE IMAGE =================
+// ================= UPLOAD PROFILE =================
 exports.uploadProfile = async (req, res, next) => {
   try {
+    console.log("📸 FILE DATA:", req.file)
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -249,10 +279,30 @@ exports.uploadProfile = async (req, res, next) => {
       })
     }
 
+    const imageUrl = req.file.path
+    const publicId = req.file.filename // Cloudinary public_id
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    })
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      })
+    }
+
+    // 🔥 DELETE OLD IMAGE
+    if (user.profileImageId) {
+      await deleteFromCloudinary(user.profileImageId)
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data: {
-        profileImage: req.file.path
+        profileImage: imageUrl,
+        profileImageId: publicId
       }
     })
 
@@ -260,10 +310,11 @@ exports.uploadProfile = async (req, res, next) => {
       success: true,
       message: "Profile image updated",
       data: {
-        profileImage: updatedUser.profileImage
+        image: updatedUser.profileImage
       }
     })
   } catch (err) {
+    console.error("🔥 UPLOAD ERROR:", err)
     next(err)
   }
 }

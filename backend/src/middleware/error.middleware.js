@@ -1,10 +1,10 @@
 const { ZodError } = require("zod")
 const { Prisma } = require("@prisma/client")
 
-module.exports = (err, req, res, next) => {
-  console.error("🔥 ERROR:", err)
+const errorHandler = (err, req, res, next) => {
+  console.error("🔥 FULL ERROR:", err)
 
-  // ================= ZOD ERROR =================
+  // ================= ZOD =================
   if (err instanceof ZodError) {
     return res.status(400).json({
       success: false,
@@ -16,7 +16,7 @@ module.exports = (err, req, res, next) => {
     })
   }
 
-  // ================= PRISMA UNIQUE =================
+  // ================= PRISMA =================
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2002") {
       return res.status(400).json({
@@ -27,7 +27,7 @@ module.exports = (err, req, res, next) => {
     }
   }
 
-  // ================= JWT ERROR =================
+  // ================= JWT =================
   if (err.name === "JsonWebTokenError") {
     return res.status(401).json({
       success: false,
@@ -42,7 +42,7 @@ module.exports = (err, req, res, next) => {
     })
   }
 
-  // ================= MULTER ERROR =================
+  // ================= MULTER =================
   if (err.name === "MulterError") {
     return res.status(400).json({
       success: false,
@@ -50,15 +50,21 @@ module.exports = (err, req, res, next) => {
     })
   }
 
-  // ================= CLOUDINARY ERROR =================
-  if (err.message?.includes("Cloudinary")) {
+  // ================= CLOUDINARY =================
+  if (
+    err.message?.toLowerCase().includes("cloudinary") ||
+    err.http_code // dari cloudinary response
+  ) {
     return res.status(500).json({
       success: false,
-      message: "Image upload failed"
+      message:
+        process.env.NODE_ENV === "development"
+          ? err.message // 🔥 tampilkan error asli
+          : "Image upload failed"
     })
   }
 
-  // ================= CUSTOM ERROR =================
+  // ================= CUSTOM =================
   if (err.status) {
     return res.status(err.status).json({
       success: false,
@@ -66,12 +72,16 @@ module.exports = (err, req, res, next) => {
     })
   }
 
-  // ================= UNKNOWN ERROR (SAFE FALLBACK) =================
+  // ================= DEFAULT =================
   return res.status(500).json({
     success: false,
     message:
       process.env.NODE_ENV === "development"
-        ? err.message
+        ? err.message // 🔥 DEBUG MODE
         : "Internal Server Error"
   })
+}
+
+module.exports = {
+  errorHandler
 }

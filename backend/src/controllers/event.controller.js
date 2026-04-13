@@ -6,10 +6,26 @@ const {
   deleteEventService
 } = require("../services/event.service")
 
-// CREATE
+// ================= CREATE =================
 exports.createEvent = async (req, res, next) => {
   try {
-    const event = await createEventService(req.body, req.user.id)
+    let image = null
+    let imageId = null
+
+    // 🔥 HANDLE IMAGE
+    if (req.file) {
+      image = req.file.path
+      imageId = req.file.filename
+    }
+
+    const event = await createEventService(
+      {
+        ...req.body,
+        image,
+        imageId
+      },
+      req.user.id
+    )
 
     res.status(201).json({
       success: true,
@@ -21,7 +37,7 @@ exports.createEvent = async (req, res, next) => {
   }
 }
 
-// GET ALL
+// ================= GET ALL =================
 exports.getEvents = async (req, res, next) => {
   try {
     const events = await getEventsService(req.query)
@@ -35,7 +51,7 @@ exports.getEvents = async (req, res, next) => {
   }
 }
 
-// GET BY ID
+// ================= GET BY ID =================
 exports.getEventById = async (req, res, next) => {
   try {
     const event = await getEventByIdService(req.params.id)
@@ -49,12 +65,24 @@ exports.getEventById = async (req, res, next) => {
   }
 }
 
-// UPDATE
+// ================= UPDATE =================
 exports.updateEvent = async (req, res, next) => {
   try {
+    let image = null
+    let imageId = null
+
+    if (req.file) {
+      image = req.file.path
+      imageId = req.file.filename
+    }
+
     const event = await updateEventService(
       req.params.id,
-      req.body,
+      {
+        ...req.body,
+        image,
+        imageId
+      },
       req.user.id
     )
 
@@ -68,7 +96,7 @@ exports.updateEvent = async (req, res, next) => {
   }
 }
 
-// DELETE
+// ================= DELETE =================
 exports.deleteEvent = async (req, res, next) => {
   try {
     await deleteEventService(req.params.id, req.user.id)

@@ -1,62 +1,132 @@
 const multer = require("multer")
 const { CloudinaryStorage } = require("multer-storage-cloudinary")
-const cloudinary = require("../utils/cloudinary")
+const { cloudinary } = require("../utils/cloudinary")
+
+// ================= CONSTANT =================
+const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
+const ALLOWED_FORMATS = ["jpg", "jpeg", "png"]
+const ALLOWED_MIME = ["image/jpeg", "image/png", "image/jpg"]
 
 // ================= STORAGE =================
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    return {
-      folder: "event-platform",
-      format: file.mimetype.split("/")[1], // auto format
-      public_id: `user-${Date.now()}`
+    try {
+      const format = file.mimetype.split("/")[1]
+
+      if (!ALLOWED_FORMATS.includes(format)) {
+        throw new Error("Invalid image format (JPG, JPEG, PNG only)")
+      }
+
+      return {
+        folder: "event-platform",
+        format,
+        public_id: `user-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+        transformation: [
+          { width: 500, height: 500, crop: "limit" },
+          { quality: "auto" }
+        ]
+      }
+
+    } catch (err) {
+      console.error("🔥 STORAGE PARAM ERROR:", err)
+      throw err
     }
   }
 })
 
 // ================= FILE FILTER =================
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ["image/jpeg", "image/png", "image/jpg"]
+  try {
+    if (!ALLOWED_MIME.includes(file.mimetype)) {
+      return cb(
+        new Error("Only JPG, JPEG, PNG images are allowed"),
+        false
+      )
+    }
 
-  if (!allowedTypes.includes(file.mimetype)) {
-    return cb(new Error("Only JPG, JPEG, PNG allowed"), false)
+    cb(null, true)
+
+  } catch (err) {
+    console.error("🔥 FILE FILTER ERROR:", err)
+    cb(err, false)
   }
-
-  cb(null, true)
 }
 
-// ================= UPLOAD CONFIG =================
+// ================= MULTER CONFIG =================
 const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 2 * 1024 * 1024 // 2MB
+    fileSize: MAX_FILE_SIZE
   }
 })
 
-// ================= ERROR HANDLER =================
+// ================= SINGLE UPLOAD =================
 const uploadSingle = (fieldName) => {
   return (req, res, next) => {
     const handler = upload.single(fieldName)
 
     handler(req, res, (err) => {
       if (err instanceof multer.MulterError) {
-        return res.status(400).json({
-          success: false,
-          message: err.message
-        })
-      } else if (err) {
+        console.error("🔥 MULTER ERROR:", err)
+
         return res.status(400).json({
           success: false,
           message: err.message
         })
       }
 
+      if (err) {
+        console.error("🔥 UPLOAD ERROR:", err)
+
+        return res.status(400).json({
+          success: false,
+          message: err.message || "Upload failed"
+        })
+      }
+
+      // 🔥 DEBUG FILE (aktifkan kalau perlu)
+      console.log("📸 Uploaded File:", req.file)
+
       next()
     })
   }
 }
 
+// ================= MULTIPLE UPLOAD =================
+const uploadMultiple = (fieldName, max = 5) => {
+  return (req, res, next) => {
+    const handler = upload.array(fieldName, max)
+
+    handler(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        console.error("🔥 MULTER MULTI ERROR:", err)
+
+        return res.status(400).json({
+          success: false,
+          message: err.message
+        })
+      }
+
+      if (err) {
+        console.error("🔥 MULTI UPLOAD ERROR:", err)
+
+        return res.status(400).json({
+          success: false,
+          message: err.message
+        })
+      }
+
+      console.log("📸 Uploaded Files:", req.files)
+
+      next()
+    })
+  }
+}
+
+// ================= EXPORT =================
 module.exports = {
-  uploadSingle
+  uploadSingle,
+  uploadMultiple
 }

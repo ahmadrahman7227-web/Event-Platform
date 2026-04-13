@@ -11,7 +11,7 @@ const {
 } = require("../controllers/transaction.controller")
 
 // ================= MIDDLEWARE =================
-const authenticate = require("../middleware/auth.middleware")
+const { verifyToken } = require("../middleware/auth.middleware")
 const authorize = require("../middleware/role.middleware")
 
 // ================= USER ROUTES =================
@@ -19,25 +19,25 @@ const authorize = require("../middleware/role.middleware")
 // 🔥 Create transaction (customer only)
 router.post(
   "/",
-  authenticate,
+  verifyToken,
   authorize("CUSTOMER"),
   createTransaction
 )
 
-// 🔥 Get my transactions (history user)
+// 🔥 Get my transactions
 router.get(
   "/me",
-  authenticate,
+  verifyToken,
   authorize("CUSTOMER"),
   getUserTransactions
 )
 
 // ================= ORGANIZER ROUTES =================
 
-// 🔥 Get all transactions (organizer dashboard)
+// 🔥 Get all transactions
 router.get(
   "/organizer",
-  authenticate,
+  verifyToken,
   authorize("ORGANIZER"),
   getOrganizerTransactions
 )
@@ -45,7 +45,7 @@ router.get(
 // 🔥 Accept transaction
 router.patch(
   "/:id/accept",
-  authenticate,
+  verifyToken,
   authorize("ORGANIZER"),
   acceptTransaction
 )
@@ -53,7 +53,7 @@ router.patch(
 // 🔥 Reject transaction
 router.patch(
   "/:id/reject",
-  authenticate,
+  verifyToken,
   authorize("ORGANIZER"),
   rejectTransaction
 )

@@ -14,62 +14,49 @@ const {
 } = require("../controllers/auth.controller")
 
 // ================= MIDDLEWARE =================
-const authenticate = require("../middleware/auth.middleware")
+const { verifyToken } = require("../middleware/auth.middleware")
 const authorize = require("../middleware/role.middleware")
 const { uploadSingle } = require("../middleware/upload.middleware")
 
-// 🔥 RATE LIMIT (KHUSUS LOGIN SAJA)
+// ================= RATE LIMIT =================
 const rateLimit = require("express-rate-limit")
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 20, // 🔥 jangan terlalu kecil
   message: {
     success: false,
     message: "Too many login attempts, please try again later"
-  },
-  standardHeaders: true,
-  legacyHeaders: false
+  }
 })
 
 // ================= AUTH =================
-
-// ✅ REGISTER (TIDAK kena limiter)
 router.post("/register", register)
-
-// 🔐 LOGIN (KENA limiter)
 router.post("/login", loginLimiter, login)
 
 // ================= PROFILE =================
-
-router.get("/profile", authenticate, getProfile)
-
-router.patch("/profile", authenticate, updateProfile)
+router.get("/profile", verifyToken, getProfile)
+router.patch("/profile", verifyToken, updateProfile)
 
 // ================= PASSWORD =================
-
-router.patch("/change-password", authenticate, changePassword)
+router.patch("/change-password", verifyToken, changePassword)
 
 // ================= RESET PASSWORD =================
-
 router.post("/forgot-password", forgotPassword)
-
 router.post("/reset-password", resetPassword)
 
 // ================= UPLOAD PROFILE =================
-
 router.patch(
   "/upload-profile",
-  authenticate,
+  verifyToken,
   uploadSingle("image"),
   uploadProfile
 )
 
-// ================= ROLE BASED ACCESS =================
-
+// ================= ROLE =================
 router.get(
-  "/organizer-only",
-  authenticate,
+  "/organizer",
+  verifyToken,
   authorize("ORGANIZER"),
   (req, res) => {
     res.json({

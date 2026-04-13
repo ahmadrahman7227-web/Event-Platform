@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
+import toast from "react-hot-toast"
 
 import bg from "../assets/bg.mp4"
 import character from "../assets/CHARACTER.jpg"
@@ -99,46 +100,52 @@ export default function Register() {
 
   // ================= HANDLE REGISTER =================
   const handleRegister = async (e) => {
-    e.preventDefault()
+  e.preventDefault()
 
-    const validationErrors = validate()
+  const validationErrors = validate()
 
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors)
-      setError("")
-      return
-    }
-
-    setLoading(true)
-    setError("")
-    setSuccess("")
-
-    try {
-      await axios.post("http://localhost:3000/api/auth/register", {
-        email: form.email,
-        password: form.password,
-        referralCode: form.referralCode || undefined
-      })
-
-      setSuccess("Register berhasil! Redirect...")
-      setTimeout(() => navigate("/login"), 1500)
-
-    } catch (err) {
-      console.log("🔥 ERROR FULL:", err.response?.data)
-
-      const resData = err.response?.data
-
-      if (resData?.message) {
-        setError(resData.message)
-      } else if (resData?.errors?.length > 0) {
-        setError(resData.errors[0].message)
-      } else {
-        setError("Register gagal")
-      }
-    } finally {
-      setLoading(false)
-    }
+  if (Object.keys(validationErrors).length > 0) {
+    setErrors(validationErrors)
+    toast.error("Form belum valid ❌")
+    return
   }
+
+  setLoading(true)
+
+  try {
+    const payload = {
+      email: form.email,
+      password: form.password
+    }
+
+    if (form.referralCode && form.referralCode.trim() !== "") {
+      payload.referralCode = form.referralCode.trim()
+    }
+
+    await axios.post(
+      "http://localhost:3000/api/auth/register",
+      payload
+    )
+
+    toast.success("Register berhasil! 🎉")
+
+    setTimeout(() => navigate("/login"), 1500)
+
+  } catch (err) {
+    console.log("🔥 ERROR FULL:", err.response?.data || err.message)
+
+    const resData = err.response?.data
+
+    toast.error(
+      resData?.message ||
+      resData?.errors?.[0]?.message ||
+      err.message ||
+      "Register gagal"
+    )
+  } finally {
+    setLoading(false)
+  }
+}
 
   // ================= VALID CHECK =================
   const isValid =

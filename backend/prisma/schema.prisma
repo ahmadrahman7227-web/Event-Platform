@@ -39,10 +39,12 @@ model User {
   referralCode String @unique
 
   referredBy String?
-  referrer   User?   @relation("UserReferral", fields: [referredBy], references: [id])
+  referrer   User?   @relation("UserReferral", fields: [referredBy], references: [id], onDelete: SetNull)
   referrals  User[]  @relation("UserReferral")
 
-  profileImage String?
+  // 🔥 CLOUDINARY
+  profileImage   String?
+  profileImageId String? // public_id
 
   resetToken    String?
   resetTokenExp DateTime?
@@ -60,6 +62,7 @@ model User {
   referralsUsed Referral[] @relation("Referred")
 
   @@index([referredBy])
+  @@index([email])
 }
 
 //////////////////////
@@ -73,8 +76,8 @@ model Referral {
 
   createdAt DateTime @default(now())
 
-  referrer     User @relation("Referrer", fields: [referrerId], references: [id])
-  referredUser User @relation("Referred", fields: [referredUserId], references: [id])
+  referrer     User @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser User @relation("Referred", fields: [referredUserId], references: [id], onDelete: Cascade)
 
   @@unique([referrerId, referredUserId])
 }
@@ -90,7 +93,7 @@ model PointHistory {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -111,9 +114,10 @@ model Coupon {
   type CouponType @default(REFERRAL)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt // 🔥 FIX
 
-  user         User          @relation(fields: [userId], references: [id])
-  transactions Transaction[] // ✅ FIX RELATION
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
 
   @@index([userId])
   @@index([expiresAt])
@@ -131,16 +135,19 @@ model Event {
   price          Int
   availableSeats Int
 
+
+  image          String?   // 🔥 TAMBAH
+  imageId        String?   // 🔥 TAMBAH
+
   startDate DateTime
   endDate   DateTime
 
   organizerId String
-  organizer   User   @relation("EventOrganizer", fields: [organizerId], references: [id])
+  organizer   User   @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // ✅ FIX RELATION
   transactions Transaction[]
 
   @@index([organizerId])
@@ -165,12 +172,14 @@ model Transaction {
   status TransactionStatus @default(PENDING)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user   User    @relation(fields: [userId], references: [id])
-  event  Event   @relation(fields: [eventId], references: [id])
-  coupon Coupon? @relation(fields: [couponId], references: [id])
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event  Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  coupon Coupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([eventId])
   @@index([couponId])
+  @@index([status])
 }

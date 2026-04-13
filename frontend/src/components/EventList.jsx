@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import api from "../utils/axios"
+import api from "../api/axios"
 import EventCard from "./EventCard"
 import SkeletonCard from "./SkeletonCard"
 import { motion } from "framer-motion"

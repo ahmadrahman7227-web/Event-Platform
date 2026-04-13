@@ -1,6 +1,7 @@
 const express = require("express")
 const router = express.Router()
 
+// ================= CONTROLLER =================
 const {
   createEvent,
   getEvents,
@@ -9,16 +10,37 @@ const {
   deleteEvent
 } = require("../controllers/event.controller")
 
-const authenticate = require("../middleware/auth.middleware")
+// ================= MIDDLEWARE =================
+const { verifyToken } = require("../middleware/auth.middleware")
 const authorize = require("../middleware/role.middleware")
+const { uploadSingle } = require("../middleware/upload.middleware")
 
-// PUBLIC
+// ================= PUBLIC =================
 router.get("/", getEvents)
 router.get("/:id", getEventById)
 
-// ORGANIZER ONLY
-router.post("/", authenticate, authorize("ORGANIZER"), createEvent)
-router.patch("/:id", authenticate, authorize("ORGANIZER"), updateEvent)
-router.delete("/:id", authenticate, authorize("ORGANIZER"), deleteEvent)
+// ================= ORGANIZER =================
+router.post(
+  "/",
+  verifyToken,
+  authorize("ORGANIZER"),
+  uploadSingle("image"), // 🔥 TAMBAHAN
+  createEvent
+)
+
+router.patch(
+  "/:id",
+  verifyToken,
+  authorize("ORGANIZER"),
+  uploadSingle("image"), // 🔥 TAMBAHAN
+  updateEvent
+)
+
+router.delete(
+  "/:id",
+  verifyToken,
+  authorize("ORGANIZER"),
+  deleteEvent
+)
 
 module.exports = router

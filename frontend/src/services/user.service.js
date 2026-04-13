@@ -1,4 +1,4 @@
-import axios from "../utils/axios"
+import axios from "../api/axios"
 
 export const getProfile = () => {
   return axios.get("/auth/profile")

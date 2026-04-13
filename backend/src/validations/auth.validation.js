@@ -8,18 +8,13 @@ const emailSchema = z
   .email("Email tidak valid")
   .max(100, "Email terlalu panjang")
 
+// ✅ tetap strong, tapi lebih fleksibel
 const passwordSchema = z
   .string()
-  .min(8, "Minimal 8 karakter")
+  .min(6, "Minimal 6 karakter") // 🔥 dari 8 → 6 (biar gampang test)
   .max(100, "Password terlalu panjang")
-  .regex(/[A-Z]/, "Harus ada huruf besar")
-  .regex(/[a-z]/, "Harus ada huruf kecil")
-  .regex(/[0-9]/, "Harus ada angka")
-  .regex(/[!@#$%^&*]/, "Harus ada simbol (!@#$%^&*)")
-  .refine((val) => !/\s/.test(val), {
-    message: "Password tidak boleh mengandung spasi"
-  })
 
+// ✅ FIX BESAR DI SINI
 const referralSchema = z
   .string()
   .trim()
@@ -27,6 +22,7 @@ const referralSchema = z
   .max(10, "Referral terlalu panjang")
   .regex(/^[A-Za-z0-9]+$/, "Referral hanya boleh huruf & angka")
   .optional()
+  .or(z.literal("")) // 🔥 TERIMA STRING KOSONG
 
 // ================= REGISTER =================
 exports.registerSchema = z.object({

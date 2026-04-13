@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react"
-import axios from "axios"
 import { useNavigate } from "react-router-dom"
+import api from "../api/axios"
+
+import useAuthStore from "../store/authStore"
 
 import bg from "../assets/bg.mp4"
 import character from "../assets/CHARACTER.jpg"
@@ -11,9 +13,10 @@ export default function Login() {
   const audioRef = useRef(null)
   const navigate = useNavigate()
 
+  const { setAuth, isAuthenticated, user } = useAuthStore()
+
   const [ready, setReady] = useState(false)
   const [loading, setLoading] = useState(false)
-
   const [showPassword, setShowPassword] = useState(false)
 
   const [form, setForm] = useState({
@@ -23,6 +26,18 @@ export default function Login() {
 
   const [error, setError] = useState("")
 
+  // ================= AUTO REDIRECT =================
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === "ORGANIZER") {
+        navigate("/dashboard")
+      } else {
+        navigate("/events")
+      }
+    }
+  }, [isAuthenticated, user])
+
+  // ================= AUDIO =================
   useEffect(() => {
     const handleUserInteraction = () => {
       if (audioRef.current) {
@@ -40,6 +55,7 @@ export default function Login() {
     }
   }, [])
 
+  // ================= FORM =================
   const handleChange = (e) => {
     setForm({
       ...form,
@@ -47,31 +63,41 @@ export default function Login() {
     })
   }
 
+  // ================= LOGIN =================
   const handleLogin = async (e) => {
     e.preventDefault()
+
+    if (!form.email || !form.password) {
+      return setError("Email dan password wajib diisi")
+    }
+
     setLoading(true)
     setError("")
 
     try {
-      const res = await axios.post(
-        "http://localhost:3000/api/auth/login",
-        form
-      )
+      const res = await api.post("/auth/login", {
+        email: form.email,
+        password: form.password
+      })
 
-      localStorage.setItem("token", res.data.token)
-      localStorage.setItem("user", JSON.stringify(res.data.user))
+      // 🔥 SIMPAN KE GLOBAL STORE
+      setAuth(res.data.data)
 
-      const user = res.data.user
+      // 🔥 redirect langsung (opsional karena useEffect sudah handle)
+      const role = res.data.data.user.role
 
-      if (user.role === "ORGANIZER") {
+      if (role === "ORGANIZER") {
         navigate("/dashboard")
       } else {
         navigate("/events")
       }
 
     } catch (err) {
+      console.log("LOGIN ERROR:", err.response?.data || err.message)
+
       setError(
-        err.response?.data?.message || "Login gagal"
+        err.response?.data?.message ||
+        "Login gagal, cek email/password"
       )
     } finally {
       setLoading(false)
@@ -88,7 +114,7 @@ export default function Login() {
         <source src={bg} type="video/mp4" />
       </video>
 
-      {/* 🔥 OVERLAY (FIX KONTRAS) */}
+      {/* OVERLAY */}
       <div className="absolute inset-0 bg-black/80" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.15),transparent_60%)]" />
 
@@ -130,6 +156,7 @@ export default function Login() {
               onChange={handleChange}
               type="email"
               placeholder="EMAIL ADDRESS"
+              autoComplete="email"
               className="
                 w-full px-4 py-3 rounded-lg
                 bg-white/10 text-white
@@ -148,6 +175,7 @@ export default function Login() {
                 onChange={handleChange}
                 type={showPassword ? "text" : "password"}
                 placeholder="PASSWORD"
+                autoComplete="current-password"
                 className="
                   w-full px-4 py-3 rounded-lg
                   bg-white/10 text-white
@@ -168,7 +196,7 @@ export default function Login() {
 
             {/* ERROR */}
             {error && (
-              <p className="text-red-400 text-sm">{error}</p>
+              <p className="text-red-400 text-sm text-center">{error}</p>
             )}
 
             {/* BUTTON */}
@@ -210,7 +238,7 @@ export default function Login() {
 
       </div>
 
-      {/* SOUND */}
+      {/* AUDIO */}
       <audio ref={audioRef} loop>
         <source src={music} type="audio/mpeg" />
       </audio>

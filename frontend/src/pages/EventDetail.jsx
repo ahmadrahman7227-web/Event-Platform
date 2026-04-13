@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import api from "../api/axios"
 import toast from "react-hot-toast"
+import { motion } from "framer-motion"
 
 export default function EventDetail() {
   const { id } = useParams()
@@ -39,11 +40,20 @@ export default function EventDetail() {
     }
   }
 
+  // ================= GUARD =================
+  if (!event) {
+    return (
+      <div className="text-center text-gray-400 mt-20">
+        Event not found
+      </div>
+    )
+  }
+
   // ================= PRICE ENGINE =================
-  const price = event?.price || 0
+  const price = event.price || 0
   const subtotal = price * quantity
 
-  // 🔥 VALID COUPON
+  // 🔥 COUPON
   const validCoupon = user?.coupons?.find(
     (c) =>
       c.code === couponCode &&
@@ -59,14 +69,15 @@ export default function EventDetail() {
 
   // 🔥 POINTS
   const availablePoints = user?.points || 0
+
   const pointsUsed = usePoints
     ? Math.min(availablePoints, subtotal - discount)
     : 0
 
-  const total = subtotal - discount - pointsUsed
+  const total = Math.max(0, subtotal - discount - pointsUsed)
 
   // ================= QUANTITY =================
-  const maxQty = event?.availableSeats || 0
+  const maxQty = event.availableSeats || 0
 
   const increaseQty = () => {
     setQuantity((q) => Math.min(maxQty, q + 1))
@@ -80,6 +91,7 @@ export default function EventDetail() {
   const isDisabled =
     booking ||
     quantity > maxQty ||
+    maxQty === 0 ||
     (couponCode && !isCouponValid)
 
   // ================= FORMAT =================
@@ -102,8 +114,7 @@ export default function EventDetail() {
       })
 
       toast.success("Booking success!")
-      navigate("/events")
-
+      navigate("/transactions")
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed")
     } finally {
@@ -113,33 +124,45 @@ export default function EventDetail() {
 
   // ================= LOADING =================
   if (loading) {
-    return <div className="text-white p-6">Loading...</div>
+    return (
+      <div className="min-h-screen bg-[#0B0F1A] flex items-center justify-center text-white">
+        Loading...
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-[#0B0F1A] text-white p-6">
       <div className="max-w-4xl mx-auto space-y-6">
 
-        <h1 className="text-3xl font-bold">{event.title}</h1>
+        {/* TITLE */}
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-3xl font-bold"
+        >
+          {event.title}
+        </motion.h1>
 
-        <div className="bg-white/5 p-4 rounded-xl">
+        {/* DESCRIPTION */}
+        <div className="glass p-4 rounded-xl">
           <p>{event.description}</p>
         </div>
 
         {/* BOOKING */}
-        <div className="bg-white/5 p-6 rounded-2xl space-y-4">
+        <div className="glass p-6 rounded-2xl space-y-4">
 
           <h2 className="text-xl font-semibold">Booking</h2>
 
           {/* QUANTITY */}
           <div className="flex items-center gap-3">
-            <button onClick={decreaseQty}>-</button>
+            <button onClick={decreaseQty} className="px-3 py-1 bg-white/10 rounded">-</button>
             <span>{quantity}</span>
-            <button onClick={increaseQty}>+</button>
+            <button onClick={increaseQty} className="px-3 py-1 bg-white/10 rounded">+</button>
           </div>
 
           <p className="text-sm text-gray-400">
-            Max: {maxQty}
+            Available Seats: {maxQty}
           </p>
 
           {/* COUPON */}
@@ -147,7 +170,7 @@ export default function EventDetail() {
             value={couponCode}
             onChange={(e) => setCouponCode(e.target.value)}
             placeholder="Coupon code"
-            className="w-full p-2 rounded bg-black/30"
+            className="input"
           />
 
           {couponCode && !isCouponValid && (
@@ -172,7 +195,7 @@ export default function EventDetail() {
             Use Points ({availablePoints})
           </label>
 
-          {/* PRICE BREAKDOWN */}
+          {/* PRICE */}
           <div className="bg-black/30 p-4 rounded space-y-2 text-sm">
 
             <div className="flex justify-between">
@@ -205,9 +228,14 @@ export default function EventDetail() {
           <button
             onClick={handleBooking}
             disabled={isDisabled}
-            className={`w-full py-2 rounded ${
-              isDisabled ? "bg-gray-500" : "bg-purple-600"
-            }`}
+            className={`
+              w-full py-3 rounded-lg font-semibold transition
+              ${
+                isDisabled
+                  ? "bg-gray-500 cursor-not-allowed"
+                  : "bg-gradient-to-r from-purple-500 to-pink-500 hover:scale-105"
+              }
+            `}
           >
             {booking ? "Processing..." : "Confirm Booking"}
           </button>

@@ -5,15 +5,11 @@ import useAuthStore from "../store/authStore"
 const instance = axios.create({
   baseURL: "http://localhost:3000/api",
   timeout: 5000,
-  headers: {
-    "Content-Type": "application/json",
-  },
 })
 
 // ================= REQUEST INTERCEPTOR =================
 instance.interceptors.request.use(
   (config) => {
-    // 🔥 ambil token dari Zustand (bukan localStorage)
     const token = useAuthStore.getState().token
 
     if (token) {
@@ -32,23 +28,17 @@ instance.interceptors.response.use(
   (error) => {
     const status = error.response?.status
 
-    // 🔥 AUTO LOGOUT (TOKEN INVALID / EXPIRED)
     if (status === 401) {
       console.warn("🔒 Unauthorized - auto logout")
-
       const logout = useAuthStore.getState().logout
       logout()
-
-      // redirect clean
       window.location.href = "/login"
     }
 
-    // 🔥 SERVER ERROR
     if (status === 500) {
       console.error("🔥 Server error")
     }
 
-    // 🔥 NETWORK ERROR
     if (!error.response) {
       console.error("🌐 Network error / backend down")
     }

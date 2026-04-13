@@ -310,7 +310,7 @@ exports.uploadProfile = async (req, res, next) => {
       success: true,
       message: "Profile image updated",
       data: {
-        image: updatedUser.profileImage
+        profileImage: updatedUser.profileImage
       }
     })
   } catch (err) {

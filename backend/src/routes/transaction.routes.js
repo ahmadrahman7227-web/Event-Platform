@@ -7,16 +7,19 @@ const {
   acceptTransaction,
   rejectTransaction,
   getUserTransactions,
-  getOrganizerTransactions
+  getOrganizerTransactions,
+  getEventAttendees,     // 🔥 FIX
+  uploadPaymentProof     // 🔥 FIX
 } = require("../controllers/transaction.controller")
 
 // ================= MIDDLEWARE =================
 const { verifyToken } = require("../middleware/auth.middleware")
 const authorize = require("../middleware/role.middleware")
+const { uploadSingle } = require("../middleware/upload.middleware") // 🔥 FIX
 
 // ================= USER ROUTES =================
 
-// 🔥 Create transaction (customer only)
+// 🔥 Create transaction
 router.post(
   "/",
   verifyToken,
@@ -56,6 +59,22 @@ router.patch(
   verifyToken,
   authorize("ORGANIZER"),
   rejectTransaction
+)
+
+// 🔥 Get attendees
+router.get(
+  "/attendees/:eventId",
+  verifyToken,
+  authorize("ORGANIZER"),
+  getEventAttendees
+)
+
+// 🔥 Upload payment proof
+router.patch(
+  "/:id/upload-proof",
+  verifyToken,
+  uploadSingle("image"),
+  uploadPaymentProof
 )
 
 // ================= EXPORT =================

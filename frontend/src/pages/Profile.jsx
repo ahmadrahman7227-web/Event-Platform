@@ -24,24 +24,42 @@ export default function Profile() {
   const [passwordSuccess, setPasswordSuccess] = useState("")
   const [passwordLoading, setPasswordLoading] = useState(false)
 
-  // ================= FETCH PROFILE =================
-  useEffect(() => {
-    fetchProfile()
-  }, [])
+  const [showPassword, setShowPassword] = useState(false)
 
-  const fetchProfile = async () => {
-    try {
-      const res = await api.get("/auth/profile")
-      setUser(res.data.data)
-      setError(false)
-    } catch (err) {
-      console.error("PROFILE ERROR:", err)
-      setError(true)
-      toast.error("Backend tidak terhubung")
-    } finally {
-      setLoading(false)
-    }
+  
+  // ================= FETCH =================
+const fetchProfile = async () => {
+  try {
+    const token = localStorage.getItem("token")
+
+    const res = await api.get("/profile", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    setUser(res.data.data)
+    setError(false)
+  } catch (err) {
+    console.error(err)
+    setError(true)
+    toast.error("Backend tidak terhubung")
+  } finally {
+    setLoading(false)
   }
+}
+
+// 🔥 TAMBAHKAN INI
+useEffect(() => {
+  fetchProfile()
+}, [])
+
+  // ================= CLEANUP PREVIEW =================
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview)
+    }
+  }, [preview])
 
   // ================= IMAGE =================
   const handleImageChange = (e) => {
@@ -60,42 +78,64 @@ export default function Profile() {
     setPreview(URL.createObjectURL(file))
   }
 
+
+//   const handleUpload = async () => {
+//   if (!image) return alert("Pilih gambar dulu")
+
+//   const formData = new FormData()
+//   formData.append("image", image)
+
+//   try {
+//     const res = await fetch("http://localhost:3000/api/auth/upload-profile", {
+//       method: "PATCH",
+//       headers: {
+//         Authorization: `Bearer ${localStorage.getItem("token")}`
+//       },
+//       body: formData
+//     })
+
+//     const data = await res.json()
+//     console.log(data)
+
+//   } catch (err) {
+//     console.error(err)
+//   }
+// }
+
   const handleUpload = async () => {
-  if (!image) return toast.error("Pilih gambar dulu")
+    if (!image) return toast.error("Pilih gambar dulu")
 
-  try {
-    setUploading(true)
+    try {
+      setUploading(true)
 
-    const formData = new FormData()
-    formData.append("image", image)
+      const formData = new FormData()
+      formData.append("image", image)
 
-    const res = await api.patch("/auth/upload-profile", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data"
-      }
-    })
+      const res = await api.patch("/auth/upload-profile", formData)
 
-    const newImage = res.data.data.image
+      const newImage = res.data.data.profileImage // SESUAI RESPONSE BACKEND
 
-    toast.success("Foto berhasil diupdate")
+      toast.success("Foto berhasil diupdate")
 
-    setUser((prev) => ({
-      ...prev,
-      image: newImage
-    }))
+      // 🔥 update local state
+      setUser((prev) => ({
+        ...prev,
+        profileImage: newImage
+      }))
 
-    updateUser({ image: newImage })
+      // 🔥 update global store (INI KUNCI NAVBAR UPDATE)
+      updateUser({ profileImage: newImage })
 
-    setImage(null)
-    setPreview(null)
+      setImage(null)
+      setPreview(null)
 
-  } catch (err) {
-    console.error("UPLOAD ERROR:", err)
-    toast.error(err.response?.data?.message || "Upload gagal")
-  } finally {
-    setUploading(false)
+    } catch (err) {
+      console.error(err)
+      toast.error(err.response?.data?.message || "Upload gagal")
+    } finally {
+      setUploading(false)
+    }
   }
-}
 
   // ================= PASSWORD =================
   const handlePasswordChange = (e) => {
@@ -156,8 +196,7 @@ export default function Profile() {
     toast.success("Copied!")
   }
 
-  // ================= UI STATES =================
-
+  // ================= STATES =================
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-[#0B0F1A] text-white">
@@ -170,24 +209,25 @@ export default function Profile() {
     return (
       <div className="h-screen flex flex-col items-center justify-center text-red-400 bg-[#0B0F1A]">
         <p>Backend tidak terhubung</p>
-        <button
-          onClick={fetchProfile}
-          className="mt-4 px-4 py-2 bg-purple-600 rounded"
-        >
+        <button onClick={fetchProfile} className="mt-4 px-4 py-2 bg-purple-600 rounded">
           Retry
         </button>
       </div>
     )
   }
 
-  // ================= MAIN UI =================
+  if (!user) {
+    return <p className="text-center text-gray-400 mt-20">No profile data</p>
+  }
+
+  // ================= UI =================
   return (
     <div className="min-h-screen bg-[#0B0F1A] text-white p-6">
       <div className="max-w-5xl mx-auto space-y-6">
 
         <h1 className="text-3xl font-bold">Profile</h1>
 
-        {/* PROFILE CARD */}
+        {/* PROFILE */}
         <div className="glass p-6 rounded-2xl flex flex-col md:flex-row gap-6">
 
           {/* IMAGE */}
@@ -195,22 +235,18 @@ export default function Profile() {
             <img
               src={
                 preview ||
-                user?.image ||
-                `https://ui-avatars.com/api/?name=${user?.email || "User"}`
+                user.profileImage ||
+                `https://ui-avatars.com/api/?name=${user.email}`
               }
               className="w-32 h-32 rounded-full object-cover border-2 border-purple-500"
             />
 
-            <input
-              type="file"
-              onChange={handleImageChange}
-              className="mt-3 text-sm"
-            />
+            <input type="file" onChange={handleImageChange} className="mt-3 text-sm" />
 
             <button
               onClick={handleUpload}
               disabled={uploading}
-              className="mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg"
+              className="mt-3 px-4 py-2 bg-purple-600 rounded-lg"
             >
               {uploading ? "Uploading..." : "Upload"}
             </button>
@@ -218,35 +254,39 @@ export default function Profile() {
 
           {/* INFO */}
           <div className="space-y-3">
-            <p>📧 {user?.email}</p>
+            <p>📧 {user.email}</p>
+            <p>👤 {user.role}</p>
 
-            <div className="flex gap-2">
-              <span>🎟 {user?.referralCode}</span>
-              <button onClick={handleCopy}>Copy</button>
+            <div className="flex gap-2 items-center">
+              <span className="text-purple-400 font-bold">
+                {user.referralCode}
+              </span>
+              <button onClick={handleCopy} className="text-sm underline">
+                Copy
+              </button>
             </div>
-
-            <p>👤 {user?.role}</p>
           </div>
         </div>
 
         {/* POINTS */}
         <div className="glass p-6 rounded-2xl">
-          <h2>Points</h2>
+          <h2 className="mb-2">Points</h2>
           <p className="text-2xl text-purple-400">
-            {user?.points || 0}
+            {user.points || 0}
           </p>
         </div>
 
         {/* COUPONS */}
         <div className="glass p-6 rounded-2xl">
-          <h2>Coupons</h2>
+          <h2 className="mb-2">Coupons</h2>
 
-          {user?.coupons?.length === 0 ? (
-            <p>No coupons</p>
+          {!user.coupons?.length ? (
+            <p className="text-gray-400">No coupons</p>
           ) : (
-            user?.coupons?.map((c) => (
-              <div key={c.id}>
-                {c.code} - {c.discount}%
+            user.coupons.map((c) => (
+              <div key={c.id} className="flex justify-between border-b border-white/10 py-2">
+                <span>{c.code}</span>
+                <span>{c.discount}%</span>
               </div>
             ))
           )}
@@ -254,34 +294,41 @@ export default function Profile() {
 
         {/* PASSWORD */}
         <div className="glass p-6 rounded-2xl">
-          <h2>Change Password</h2>
+          <h2 className="mb-3">Change Password</h2>
 
           <input
             name="oldPassword"
+            type={showPassword ? "text" : "password"}
+            placeholder="Old Password"
             value={passwordForm.oldPassword}
             onChange={handlePasswordChange}
-            type="password"
-            placeholder="Old Password"
-            className="w-full mb-2 p-2 rounded bg-black/30"
+            className="input mb-2"
           />
 
           <input
             name="newPassword"
+            type={showPassword ? "text" : "password"}
+            placeholder="New Password"
             value={passwordForm.newPassword}
             onChange={handlePasswordChange}
-            type="password"
-            placeholder="New Password"
-            className="w-full mb-2 p-2 rounded bg-black/30"
+            className="input mb-2"
           />
 
           <input
             name="confirmPassword"
+            type={showPassword ? "text" : "password"}
+            placeholder="Confirm Password"
             value={passwordForm.confirmPassword}
             onChange={handlePasswordChange}
-            type="password"
-            placeholder="Confirm Password"
-            className="w-full mb-2 p-2 rounded bg-black/30"
+            className="input mb-2"
           />
+
+          <label className="text-sm">
+            <input
+              type="checkbox"
+              onChange={() => setShowPassword(!showPassword)}
+            /> Show Password
+          </label>
 
           {passwordError && <p className="text-red-400">{passwordError}</p>}
           {passwordSuccess && <p className="text-green-400">{passwordSuccess}</p>}

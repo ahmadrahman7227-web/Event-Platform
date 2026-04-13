@@ -38,14 +38,19 @@ model User {
   role         Role   @default(CUSTOMER)
   referralCode String @unique
 
+  // 🔥 TAMBAHAN WAJIB (FIX FRONTEND)
+  points Int @default(0)
+
+  // REFERRAL
   referredBy String?
   referrer   User?   @relation("UserReferral", fields: [referredBy], references: [id], onDelete: SetNull)
   referrals  User[]  @relation("UserReferral")
 
   // 🔥 CLOUDINARY
   profileImage   String?
-  profileImageId String? // public_id
+  profileImageId String?
 
+  // RESET PASSWORD
   resetToken    String?
   resetTokenExp DateTime?
 
@@ -63,6 +68,7 @@ model User {
 
   @@index([referredBy])
   @@index([email])
+  @@index([createdAt]) // 🔥 PERFORMANCE
 }
 
 //////////////////////
@@ -114,7 +120,7 @@ model Coupon {
   type CouponType @default(REFERRAL)
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt // 🔥 FIX
+  updatedAt DateTime @default(now()) @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
@@ -135,15 +141,15 @@ model Event {
   price          Int
   availableSeats Int
 
-
-  image          String?   // 🔥 TAMBAH
-  imageId        String?   // 🔥 TAMBAH
+  // 🔥 CLOUDINARY EVENT IMAGE
+  image   String?
+  imageId String?
 
   startDate DateTime
   endDate   DateTime
 
   organizerId String
-  organizer   User   @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  organizer   User @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -152,6 +158,7 @@ model Event {
 
   @@index([organizerId])
   @@index([startDate])
+  @@index([createdAt]) // 🔥 PERFORMANCE
 }
 
 //////////////////////
@@ -162,6 +169,10 @@ model Transaction {
   id      String @id @default(uuid())
   userId  String
   eventId String
+
+  // 🔥 PAYMENT PROOF
+  paymentProof   String?
+  paymentProofId String?
 
   quantity   Int
   totalPrice Int
@@ -182,4 +193,5 @@ model Transaction {
   @@index([eventId])
   @@index([couponId])
   @@index([status])
+  @@index([createdAt]) // 🔥 PERFORMANCE
 }

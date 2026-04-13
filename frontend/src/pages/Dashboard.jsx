@@ -37,9 +37,29 @@ export default function Dashboard() {
     }
   }
 
-  if (loading) return <div className="text-white p-6">Loading...</div>
+  // ================= LOADING =================
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0B0F1A] p-6 grid md:grid-cols-3 gap-6">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="glass p-6 rounded-2xl animate-pulse">
+            <div className="h-6 bg-white/10 mb-2"></div>
+            <div className="h-10 bg-white/10"></div>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
-  // 🔥 CHART DATA
+  // ================= EMPTY =================
+  if (!stats) {
+    return (
+      <div className="text-center text-gray-400 mt-20">
+        No dashboard data
+      </div>
+    )
+  }
+
   const chartData = transactions.map((t) => ({
     name: t.event.title.slice(0, 5),
     value: t.totalPrice
@@ -51,9 +71,8 @@ export default function Dashboard() {
 
         <h1 className="text-3xl font-bold">Dashboard</h1>
 
-        {/* 🔥 STATS */}
+        {/* STATS */}
         <div className="grid md:grid-cols-3 gap-4">
-
           {[
             { label: "Events", value: stats.totalEvents },
             { label: "Transactions", value: stats.totalTransactions },
@@ -62,17 +81,16 @@ export default function Dashboard() {
             <motion.div
               key={i}
               whileHover={{ scale: 1.05 }}
-              className="bg-white/5 p-6 rounded-2xl backdrop-blur-xl border border-white/10 shadow-lg"
+              className="glass p-6 rounded-2xl shadow-lg"
             >
               <p className="text-gray-400">{item.label}</p>
               <h2 className="text-2xl font-bold">{item.value}</h2>
             </motion.div>
           ))}
-
         </div>
 
-        {/* 🔥 CHART */}
-        <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+        {/* CHART */}
+        <div className="glass p-6 rounded-2xl">
           <h2 className="mb-4 font-semibold">Revenue Chart</h2>
 
           <ResponsiveContainer width="100%" height={300}>
@@ -85,9 +103,8 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* 🔥 TRANSACTIONS */}
-        <div className="bg-white/5 p-6 rounded-2xl space-y-3">
-
+        {/* TRANSACTIONS */}
+        <div className="glass p-6 rounded-2xl space-y-3">
           <h2 className="text-xl font-semibold">Recent Transactions</h2>
 
           {transactions.map((t) => (
@@ -109,7 +126,6 @@ export default function Dashboard() {
               </span>
             </motion.div>
           ))}
-
         </div>
 
       </div>

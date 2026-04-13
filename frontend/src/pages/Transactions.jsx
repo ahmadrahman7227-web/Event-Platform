@@ -23,7 +23,7 @@ export default function Transactions() {
     }
   }
 
-  // ================= FORMAT PRICE =================
+  // ================= FORMAT =================
   const formatPrice = (num) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -43,15 +43,28 @@ export default function Transactions() {
     }
   }
 
+  // ================= UPLOAD =================
+  const handleUpload = async (id, file) => {
+    if (!file) return
+
+    const formData = new FormData()
+    formData.append("image", file)
+
+    try {
+      await api.patch(`/transactions/${id}/upload-proof`, formData)
+      toast.success("Uploaded!")
+      fetchData()
+    } catch {
+      toast.error("Upload gagal")
+    }
+  }
+
   // ================= LOADING =================
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0B0F1A] p-6 grid md:grid-cols-2 gap-4">
         {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className="h-28 bg-white/10 animate-pulse rounded-xl"
-          />
+          <div key={i} className="h-28 bg-white/10 animate-pulse rounded-xl" />
         ))}
       </div>
     )
@@ -70,26 +83,18 @@ export default function Transactions() {
     <div className="min-h-screen bg-[#0B0F1A] text-white p-6">
       <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* TITLE */}
         <h1 className="text-3xl font-bold">My Transactions</h1>
 
-        {/* LIST */}
         <div className="grid md:grid-cols-2 gap-4">
 
           {data.map((t) => (
             <motion.div
               key={t.id}
               whileHover={{ scale: 1.03 }}
-              className="
-                bg-white/5 backdrop-blur-xl
-                border border-white/10
-                rounded-2xl p-5
-                shadow-lg transition
-              "
+              className="glass p-5 rounded-2xl shadow-lg"
             >
               {/* HEADER */}
               <div className="flex justify-between items-start mb-3">
-
                 <div>
                   <h2 className="text-lg font-semibold">
                     {t.event?.title || "Event"}
@@ -107,7 +112,6 @@ export default function Transactions() {
                 >
                   {t.status}
                 </span>
-
               </div>
 
               {/* BODY */}
@@ -137,6 +141,26 @@ export default function Transactions() {
                     <span>Coupon</span>
                     <span>{t.coupon.code}</span>
                   </div>
+                )}
+
+                {/* 🔥 PAYMENT PROOF */}
+                {t.paymentProof && (
+                  <img
+                    src={t.paymentProof}
+                    alt="proof"
+                    className="w-32 mt-2 rounded"
+                  />
+                )}
+
+                {/* 🔥 UPLOAD */}
+                {t.status === "PENDING" && (
+                  <input
+                    type="file"
+                    onChange={(e) =>
+                      handleUpload(t.id, e.target.files[0])
+                    }
+                    className="mt-2 text-xs"
+                  />
                 )}
 
               </div>

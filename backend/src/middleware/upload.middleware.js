@@ -3,7 +3,7 @@ const { CloudinaryStorage } = require("multer-storage-cloudinary")
 const { cloudinary } = require("../utils/cloudinary")
 
 // ================= CONSTANT =================
-const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
+const MAX_FILE_SIZE = 2 * 1024 * 1024
 const ALLOWED_FORMATS = ["jpg", "jpeg", "png"]
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/jpg"]
 
@@ -11,46 +11,30 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/jpg"]
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    try {
-      const format = file.mimetype.split("/")[1]
+    const format = file.mimetype.split("/")[1]
 
-      if (!ALLOWED_FORMATS.includes(format)) {
-        throw new Error("Invalid image format (JPG, JPEG, PNG only)")
-      }
+    if (!ALLOWED_FORMATS.includes(format)) {
+      throw new Error("Invalid image format (JPG, JPEG, PNG only)")
+    }
 
-      return {
-        folder: "event-platform",
-        format,
-        public_id: `user-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
-        transformation: [
-          { width: 500, height: 500, crop: "limit" },
-          { quality: "auto" }
-        ]
-      }
-
-    } catch (err) {
-      console.error("🔥 STORAGE PARAM ERROR:", err)
-      throw err
+    return {
+      folder: "event-platform",
+      format,
+      public_id: `user-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+      transformation: [
+        { width: 500, height: 500, crop: "limit" },
+        { quality: "auto" }
+      ]
     }
   }
 })
 
 // ================= FILE FILTER =================
 const fileFilter = (req, file, cb) => {
-  try {
-    if (!ALLOWED_MIME.includes(file.mimetype)) {
-      return cb(
-        new Error("Only JPG, JPEG, PNG images are allowed"),
-        false
-      )
-    }
-
-    cb(null, true)
-
-  } catch (err) {
-    console.error("🔥 FILE FILTER ERROR:", err)
-    cb(err, false)
+  if (!ALLOWED_MIME.includes(file.mimetype)) {
+    return cb(new Error("Only JPG, JPEG, PNG images are allowed"), false)
   }
+  cb(null, true)
 }
 
 // ================= MULTER CONFIG =================
@@ -62,12 +46,13 @@ const upload = multer({
   }
 })
 
-// ================= SINGLE UPLOAD =================
+// ================= FIXED SINGLE UPLOAD =================
 const uploadSingle = (fieldName) => {
   return (req, res, next) => {
-    const handler = upload.single(fieldName)
 
-    handler(req, res, (err) => {
+    // 🔥 LANGSUNG PAKAI upload.single
+    upload.single(fieldName)(req, res, (err) => {
+
       if (err instanceof multer.MulterError) {
         console.error("🔥 MULTER ERROR:", err)
 
@@ -86,7 +71,7 @@ const uploadSingle = (fieldName) => {
         })
       }
 
-      // 🔥 DEBUG FILE (aktifkan kalau perlu)
+      // 🔥 DEBUG (AKTIF SEKARANG)
       console.log("📸 Uploaded File:", req.file)
 
       next()
@@ -97,9 +82,8 @@ const uploadSingle = (fieldName) => {
 // ================= MULTIPLE UPLOAD =================
 const uploadMultiple = (fieldName, max = 5) => {
   return (req, res, next) => {
-    const handler = upload.array(fieldName, max)
+    upload.array(fieldName, max)(req, res, (err) => {
 
-    handler(req, res, (err) => {
       if (err instanceof multer.MulterError) {
         console.error("🔥 MULTER MULTI ERROR:", err)
 

@@ -43,13 +43,26 @@ const authLimiter = rateLimit({
 })
 
 // ================= MIDDLEWARE =================
-app.use(helmet())
+
+// 🔥 Helmet fix (biar tidak ganggu CORS)
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false
+  })
+)
+
 app.use(morgan("dev"))
 
-app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true
-}))
+// 🔥 CORS FIX (SIMPLE & STABLE)
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true
+  })
+)
+
+// ❌ HAPUS INI (BIKIN CRASH DI EXPRESS BARU)
+// app.options("*", cors())
 
 app.use(globalLimiter)
 

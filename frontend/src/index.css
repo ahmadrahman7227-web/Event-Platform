@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-
 html {
   scroll-behavior: smooth;
 }
@@ -10,12 +9,29 @@ html {
 body {
   overflow-x: hidden;
   overscroll-behavior: none;
+  background: #0B0F1A;
 }
 
 * {
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
 }
 
+/* 🔥 GLASS EFFECT */
 .glass {
   @apply bg-white/5 backdrop-blur-xl border border-white/10;
+}
+
+/* 🔥 INPUT GLOBAL */
+.input {
+  @apply w-full p-3 rounded-lg bg-white/10 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500;
+}
+
+/* 🔥 SCROLLBAR */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #6b21a8;
+  border-radius: 10px;
 }

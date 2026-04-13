@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-const useAuthStore = create((set) => ({
+const useAuthStore = create((set, get) => ({
   // ================= STATE =================
   user: null,
   token: null,
@@ -8,65 +8,73 @@ const useAuthStore = create((set) => ({
 
   // ================= SET AUTH =================
   setAuth: ({ token, user }) => {
-    localStorage.setItem("token", token)
-    localStorage.setItem("user", JSON.stringify(user))
-
-    set({
-      user,
-      token,
-      isAuthenticated: true
-    })
-  },
-
-  // ================= LOAD FROM STORAGE =================
-  loadAuth: () => {
     try {
-      const token = localStorage.getItem("token")
-      const rawUser = localStorage.getItem("user")
+      if (!token || !user) throw new Error("Invalid auth data")
 
-      if (!token || !rawUser || rawUser === "undefined") {
-        return set({
-          user: null,
-          token: null,
-          isAuthenticated: false
-        })
-      }
-
-      const user = JSON.parse(rawUser)
+      localStorage.setItem("token", token)
+      localStorage.setItem("user", JSON.stringify(user))
 
       set({
         user,
         token,
         isAuthenticated: true
       })
-
     } catch (err) {
-      console.error("AUTH LOAD ERROR:", err)
-
-      set({
-        user: null,
-        token: null,
-        isAuthenticated: false
-      })
+      console.error("SET AUTH ERROR:", err)
     }
   },
 
-  // ================= 🔥 UPDATE USER (PENTING BANGET) =================
+  // ================= LOAD AUTH =================
+  loadAuth: () => {
+    try {
+      const token = localStorage.getItem("token")
+      const rawUser = localStorage.getItem("user")
+
+      // 🔥 VALIDATION STRONG
+      if (!token || !rawUser || rawUser === "undefined") {
+        return get().clearAuth()
+      }
+
+      const user = JSON.parse(rawUser)
+
+      // 🔥 OPTIONAL VALIDATION
+      if (!user?.id || !user?.email) {
+        return get().clearAuth()
+      }
+
+      set({
+        user,
+        token,
+        isAuthenticated: true
+      })
+    } catch (err) {
+      console.error("AUTH LOAD ERROR:", err)
+      get().clearAuth()
+    }
+  },
+
+  // ================= UPDATE USER =================
   updateUser: (newData) => {
-    set((state) => {
+    try {
+      const currentUser = get().user
+
+      if (!currentUser) return
+
       const updatedUser = {
-        ...state.user,
+        ...currentUser,
         ...newData
       }
 
       localStorage.setItem("user", JSON.stringify(updatedUser))
 
-      return { user: updatedUser }
-    })
+      set({ user: updatedUser })
+    } catch (err) {
+      console.error("UPDATE USER ERROR:", err)
+    }
   },
 
-  // ================= LOGOUT =================
-  logout: () => {
+  // ================= CLEAR AUTH =================
+  clearAuth: () => {
     localStorage.removeItem("token")
     localStorage.removeItem("user")
 
@@ -75,7 +83,23 @@ const useAuthStore = create((set) => ({
       token: null,
       isAuthenticated: false
     })
-  }
+  },
+
+  // ================= LOGOUT =================
+  logout: () => {
+    get().clearAuth()
+  },
+
+  // ================= HELPERS =================
+  isOrganizer: () => get().user?.role === "ORGANIZER",
+  isCustomer: () => get().user?.role === "CUSTOMER"
 }))
+
+// ================= 🔥 AUTO SYNC ANTAR TAB =================
+window.addEventListener("storage", (e) => {
+  if (e.key === "token" || e.key === "user") {
+    useAuthStore.getState().loadAuth()
+  }
+})
 
 export default useAuthStore

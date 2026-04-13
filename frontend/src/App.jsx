@@ -10,7 +10,7 @@ import Register from "./pages/Register"
 import Dashboard from "./pages/Dashboard"
 import Profile from "./pages/Profile"
 import Events from "./pages/Events"
-import EventDetail from "./pages/EventDetail" // 🔥 TAMBAHAN
+import EventDetail from "./pages/EventDetail"
 import Transactions from "./pages/Transactions"
 import CreateEvent from "./pages/CreateEvent"
 
@@ -22,10 +22,17 @@ import ProtectedRoute from "./routes/ProtectedRoute"
 
 function App() {
   const loadAuth = useAuthStore((state) => state.loadAuth)
+  const user = useAuthStore((state) => state.user)
 
   useEffect(() => {
     loadAuth()
   }, [])
+
+  // 🔥 SMART REDIRECT (LEVEL PRO)
+  const getDefaultRoute = () => {
+    if (!user) return "/login"
+    return user.role === "ORGANIZER" ? "/dashboard" : "/events"
+  }
 
   return (
     <>
@@ -33,14 +40,17 @@ function App() {
 
       <Routes>
 
-        {/* 🌐 PUBLIC ROUTES */}
+        {/* 🌐 PUBLIC */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-        {/* 🔐 ORGANIZER ONLY */}
+        {/* 🔐 DEFAULT REDIRECT AFTER LOGIN */}
+        <Route path="/redirect" element={<Navigate to={getDefaultRoute()} />} />
+
+        {/* 🔐 ORGANIZER */}
         <Route
           path="/dashboard"
           element={
@@ -50,27 +60,44 @@ function App() {
           }
         />
 
-        {/* 🔐 CUSTOMER ONLY */}
+        <Route
+          path="/create-event"
+          element={
+            <ProtectedRoute role="ORGANIZER">
+              <CreateEvent />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 🔐 CUSTOMER */}
+        <Route
+          path="/transactions"
+          element={
+            <ProtectedRoute role="CUSTOMER">
+              <Transactions />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 🔐 ALL USER (CUSTOMER + ORGANIZER) */}
         <Route
           path="/events"
           element={
-            <ProtectedRoute role="CUSTOMER">
+            <ProtectedRoute>
               <Events />
             </ProtectedRoute>
           }
         />
 
-        {/* 🔥 EVENT DETAIL (NEW) */}
         <Route
           path="/events/:id"
           element={
-            <ProtectedRoute role="CUSTOMER">
+            <ProtectedRoute>
               <EventDetail />
             </ProtectedRoute>
           }
         />
 
-        {/* 🔐 ALL LOGIN USER */}
         <Route
           path="/profile"
           element={
@@ -79,24 +106,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
-        <Route
-  path="/transactions"
-  element={
-    <ProtectedRoute role="CUSTOMER">
-      <Transactions />
-    </ProtectedRoute>
-  }
-/>
-
-<Route
-  path="/create-event"
-  element={
-    <ProtectedRoute role="ORGANIZER">
-      <CreateEvent />
-    </ProtectedRoute>
-  }
-/>
 
         {/* ❌ FALLBACK */}
         <Route path="*" element={<Navigate to="/" />} />
